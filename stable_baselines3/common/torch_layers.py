@@ -114,6 +114,7 @@ def create_mlp(
     activation_fn: Type[nn.Module] = nn.ReLU,
     squash_output: bool = False,
     with_bias: bool = True,
+    use_sigmoid: bool = False,
     pre_linear_modules: Optional[List[Type[nn.Module]]] = None,
     post_linear_modules: Optional[List[Type[nn.Module]]] = None,
 ) -> List[nn.Module]:
@@ -180,6 +181,8 @@ def create_mlp(
         modules.append(nn.Linear(last_layer_dim, output_dim, bias=with_bias))
     if squash_output:
         modules.append(nn.Tanh())
+    if use_sigmoid:
+        modules.append(nn.Sigmoid())
     return modules
 
 
