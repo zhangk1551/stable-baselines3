@@ -247,7 +247,8 @@ class SAC(OffPolicyAlgorithm):
                 next_actions, next_log_prob = self.actor.action_log_prob(replay_data.next_observations)
                 # Compute the next Q values: min over all critics targets
                 next_q_values = th.cat(self.critic_target(replay_data.next_observations, next_actions), dim=1)
-                next_q_values, _ = th.min(next_q_values, dim=1, keepdim=True)
+#                next_q_values, _ = th.min(next_q_values, dim=1, keepdim=True)
+                next_q_values = th.mean(next_q_values, dim=1, keepdim=True)
                 # add entropy term
                 next_q_values = next_q_values - ent_coef * next_log_prob.reshape(-1, 1)
                 # td error + entropy term
@@ -259,7 +260,15 @@ class SAC(OffPolicyAlgorithm):
             current_q_values = self.critic(replay_data.observations, replay_data.actions)
 
             # Compute critic loss
+#            print("rewards")
+#            print(replay_data.rewards)
+#            print("current_q_values")
+#            print(current_q_values)
+#            print("target_q_values")
+#            print(target_q_values.shape)
+#            print(target_q_values)
             critic_loss = 0.5 * sum(F.mse_loss(current_q, target_q_values) for current_q in current_q_values)
+#            critic_loss = 0.5 * sum(F.binary_cross_entropy(current_q, target_q_values) for current_q in current_q_values)
             assert isinstance(critic_loss, th.Tensor)  # for type checker
             critic_losses.append(critic_loss.item())  # type: ignore[union-attr]
 
@@ -272,8 +281,13 @@ class SAC(OffPolicyAlgorithm):
             # Alternative: actor_loss = th.mean(log_prob - qf1_pi)
             # Min over all critic networks
             q_values_pi = th.cat(self.critic(replay_data.observations, actions_pi), dim=1)
+#            print("q_values_pi")
+#            print(q_values_pi)
             min_qf_pi, _ = th.min(q_values_pi, dim=1, keepdim=True)
             actor_loss = (ent_coef * log_prob - min_qf_pi).mean()
+#            actor_loss = (ent_coef * log_prob - th.log(min_qf_pi)).mean()
+#            print("actor_loss")
+#            print(actor_loss)
             actor_losses.append(actor_loss.item())
 
             # Optimize the actor
