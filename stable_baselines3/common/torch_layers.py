@@ -182,7 +182,8 @@ def create_mlp(
     if squash_output:
         modules.append(nn.Tanh())
     if use_sigmoid:
-        modules.append(nn.ReLU())
+#        modules.append(nn.ReLU())
+        modules.append(nn.Sigmoid())
     return modules
 
 

@@ -13,6 +13,8 @@ from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedul
 from stable_baselines3.common.utils import get_parameters_by_name, polyak_update
 from stable_baselines3.sac.policies import Actor, CnnPolicy, MlpPolicy, MultiInputPolicy, SACPolicy
 
+from torchdriveenv.diffusion_expert import DiffusionExpert
+
 SelfSAC = TypeVar("SelfSAC", bound="SAC")
 
 
@@ -153,6 +155,8 @@ class SAC(OffPolicyAlgorithm):
         self.target_update_interval = target_update_interval
         self.ent_coef_optimizer: Optional[th.optim.Adam] = None
 
+        self.diffusion_expert = DiffusionExpert("pretrained_edm_module/model.ckpt")
+
         if _init_setup_model:
             self._setup_model()
 
@@ -250,7 +254,8 @@ class SAC(OffPolicyAlgorithm):
 #                next_q_values, _ = th.min(next_q_values, dim=1, keepdim=True)
                 next_q_values = th.mean(next_q_values, dim=1, keepdim=True)
                 # add entropy term
-                next_q_values = next_q_values - ent_coef * next_log_prob.reshape(-1, 1)
+#                next_q_values = next_q_values - ent_coef * next_log_prob.reshape(-1, 1)
+#                next_q_values = next_q_values / th.exp(th.pow(next_log_prob, ent_coef)).reshape(-1, 1)
                 # td error + entropy term
 #                target_q_values = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values
                 target_q_values = th.exp(replay_data.rewards) * th.pow(next_q_values, (1 - replay_data.dones))
@@ -258,6 +263,7 @@ class SAC(OffPolicyAlgorithm):
             # Get current Q-values estimates for each critic network
             # using action from the replay buffer
             current_q_values = self.critic(replay_data.observations, replay_data.actions)
+#            target_q_values = th.clamp(target_q_values, min=0, max=1)
 
             # Compute critic loss
 #            print("rewards")
@@ -267,8 +273,8 @@ class SAC(OffPolicyAlgorithm):
 #            print("target_q_values")
 #            print(target_q_values.shape)
 #            print(target_q_values)
-            critic_loss = 0.5 * sum(F.mse_loss(current_q, target_q_values) for current_q in current_q_values)
-#            critic_loss = 0.5 * sum(F.binary_cross_entropy(current_q, target_q_values) for current_q in current_q_values)
+#            critic_loss = 0.5 * sum(F.mse_loss(current_q, target_q_values) for current_q in current_q_values)
+            critic_loss = 0.5 * sum(F.binary_cross_entropy(current_q, target_q_values) for current_q in current_q_values)
             assert isinstance(critic_loss, th.Tensor)  # for type checker
             critic_losses.append(critic_loss.item())  # type: ignore[union-attr]
 
@@ -284,7 +290,14 @@ class SAC(OffPolicyAlgorithm):
 #            print("q_values_pi")
 #            print(q_values_pi)
             min_qf_pi, _ = th.min(q_values_pi, dim=1, keepdim=True)
-            actor_loss = (ent_coef * log_prob - min_qf_pi).mean()
+            min_qf_pi = th.max(min_qf_pi, th.tensor(0.1, device=self.device))
+#            p_c = th.exp(self.diffusion_expert.expert_batch_logp_from_energy(action=actions_pi, observation=replay_data.observations))
+            logp_c = self.diffusion_expert.expert_batch_logp_from_energy(action=actions_pi, observation=replay_data.observations)
+            logp_c = th.max(logp_c, th.tensor(0.1, device=self.device))
+            actor_loss = (ent_coef * log_prob - th.log(min_qf_pi) - logp_c).mean()
+#            actor_loss = (ent_coef * log_prob - min_qf_pi * p_c).mean()
+            # TODO: revise the entropy term here
+#            actor_loss = (ent_coef * log_prob - min_qf_pi).mean()
 #            actor_loss = (ent_coef * log_prob - th.log(min_qf_pi)).mean()
 #            print("actor_loss")
 #            print(actor_loss)
