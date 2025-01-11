@@ -1,3 +1,4 @@
+# in local repo
 """Policies: abstract base class and concrete implementations."""
 
 import collections
@@ -127,6 +128,9 @@ class BaseModel(nn.Module):
         :param features_extractor: The features extractor to use.
         :return: The extracted features
         """
+#        print("extract_features")
+#        print("normalize_images")
+#        print(self.normalize_images)
         preprocessed_obs = preprocess_obs(obs, self.observation_space, normalize_images=self.normalize_images)
         return features_extractor(preprocessed_obs)
 
@@ -367,7 +371,7 @@ class BasePolicy(BaseModel, ABC):
         with th.no_grad():
             actions = self._predict(obs_tensor, deterministic=deterministic)
         # Convert to numpy, and reshape to the original action shape
-        actions = actions.cpu().numpy().reshape((-1, *self.action_space.shape))  # type: ignore[misc, assignment]
+        actions = actions.cpu().numpy().reshape((-1, *self.action_space.shape))  # type: ignore[misc]
 
         if isinstance(self.action_space, spaces.Box):
             if self.squash_output:
@@ -922,7 +926,7 @@ class ContinuousCritic(BaseModel):
     By default, it creates two critic networks used to reduce overestimation
     thanks to clipped Q-learning (cf TD3 paper).
 
-    :param observation_space: Observation space
+    :param observation_space: Obervation space
     :param action_space: Action space
     :param net_arch: Network architecture
     :param features_extractor: Network to extract features
@@ -948,7 +952,7 @@ class ContinuousCritic(BaseModel):
         activation_fn: Type[nn.Module] = nn.ReLU,
         normalize_images: bool = True,
         n_critics: int = 2,
-        share_features_extractor: bool = True,
+        share_features_extractor: bool = False,
     ):
         super().__init__(
             observation_space,
@@ -959,7 +963,8 @@ class ContinuousCritic(BaseModel):
 
         action_dim = get_action_dim(self.action_space)
 
-        self.share_features_extractor = share_features_extractor
+#        self.share_features_extractor = share_features_extractor
+        self.share_features_extractor = False
         self.n_critics = n_critics
         self.q_networks: List[nn.Module] = []
         for idx in range(n_critics):
@@ -971,6 +976,7 @@ class ContinuousCritic(BaseModel):
     def forward(self, obs: th.Tensor, actions: th.Tensor) -> Tuple[th.Tensor, ...]:
         # Learn the features extractor using the policy loss only
         # when the features_extractor is shared with the actor
+        print("enter continuous critic forward")
         with th.set_grad_enabled(not self.share_features_extractor):
             features = self.extract_features(obs, self.features_extractor)
         qvalue_input = th.cat([features, actions], dim=1)
@@ -982,6 +988,14 @@ class ContinuousCritic(BaseModel):
         This allows to reduce computation when all the estimates are not needed
         (e.g. when updating the policy in TD3).
         """
-        with th.no_grad():
-            features = self.extract_features(obs, self.features_extractor)
+#        with th.no_grad():
+#        print("features_extractor")
+#        print(self.features_extractor)
+#        print("enter q1_forward")
+#        print("normalize_images")
+#        print(self.normalize_images)
+        features = self.extract_features(obs, self.features_extractor)
+#        print("enter q1_forward")
+#        print("features")
+#        print(features)
         return self.q_networks[0](th.cat([features, actions], dim=1))
