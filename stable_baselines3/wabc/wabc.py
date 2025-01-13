@@ -128,7 +128,7 @@ class WABC(OffPolicyAlgorithm):
             supported_action_spaces=(spaces.Box,),
             support_multi_env=True,
         )
-#        target_update_interval = 100
+        target_update_interval = 100
 
         self.exploration_initial_eps = exploration_initial_eps
         self.exploration_final_eps = exploration_final_eps
@@ -195,7 +195,7 @@ class WABC(OffPolicyAlgorithm):
         losses = []
 #        batch_size = 2
 #        self.next_action_sample_num = 1
-        batch_size = 4
+#        batch_size = 4
         for _ in range(gradient_steps):
             # Sample replay buffer
             replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)  # type: ignore[union-attr]
@@ -211,6 +211,7 @@ class WABC(OffPolicyAlgorithm):
                 next_b_values = self.b_net_target.q1_forward(expanded_next_obs, next_actions)
                 next_b_values = next_b_values.reshape(batch_size, self.next_action_sample_num)
                 # TODO: **Weighted** average over all the actions
+#                next_b_values, _ = th.max(next_b_values, dim=-1, keepdim=True)
 #                next_b_values = th.mean(next_b_values, dim=-1, keepdim=True)
                 next_action_prob /= next_action_prob.sum(dim=-1, keepdim=True)
                 next_b_values = th.sum(next_b_values * next_action_prob, dim=-1, keepdim=True)
@@ -220,13 +221,22 @@ class WABC(OffPolicyAlgorithm):
 #                next_q_values = next_q_values.reshape(-1, 1)
                 # 1-step TD target
                 target_b_values = th.exp(replay_data.rewards) * th.pow(next_b_values, (1 - replay_data.dones))
+#                count_ones = th.sum(target_b_values == 1)
+#                print(f"1: {count_ones.item()}")
+#                count_zeros = th.sum(target_b_values == 0)
+#                print(f"0: {count_zeros.item()}")
+#                print("rewards dones target_b_values:")
+#                print(th.cat([replay_data.rewards, replay_data.dones, target_b_values], dim=-1))
 #                target_q_values = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values
 
 
             # Get current Q-values estimates
             current_b_values = self.b_net.q1_forward(replay_data.observations, replay_data.actions)
+
 #            print("replay_data.observations")
 #            print(replay_data.observations)
+#            print("replay_data.next_observations")
+#            print(replay_data.next_observations)
 #            print("replay_data.actions")
 #            print(replay_data.actions)
 ##            print("rewards")

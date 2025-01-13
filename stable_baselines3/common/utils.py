@@ -131,7 +131,7 @@ def check_static(obs) -> th.Tensor:
 
 def get_grid_action_prob(fn, observation, vmin_x=-1.0, vmax_x=1.0, vmin_y=-1.0, vmax_y=1.0, nticks=10, interpolation_num=10, p_energy=False):
 #    action_x, action_y = np.meshgrid(np.linspace(vmin_x, vmax_x, nticks), np.linspace(vmin_y, vmax_y, nticks))
-    nticks = 51
+    nticks = 11
 #    interpolation_num = 100
     action_y, action_x = np.meshgrid(np.linspace(vmin_y, vmax_y, nticks), np.linspace(vmin_x, vmax_x, nticks))
 #    print("action_x.shape")
@@ -177,11 +177,12 @@ def get_grid_action_prob(fn, observation, vmin_x=-1.0, vmax_x=1.0, vmin_y=-1.0, 
         log_p_max = np.max(log_p, axis=(1, 2), keepdims=True)
         p = np.exp(log_p - log_p_max)
         p = p / np.sum(p, axis=(1, 2), keepdims=True)
-#        p = p * 0.8 + 0.2
+        p = p * 0.9 + 0.1
     else:
         # b_net
         p = fn(actions=actions, obs=observation).reshape(
             (batch_size, nticks, nticks)).transpose(1, 2).detach().cpu().numpy()
+#        p = p / np.sum(p, axis=(1, 2), keepdims=True)
 
 
 #    print("p before interpolation")

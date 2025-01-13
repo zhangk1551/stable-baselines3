@@ -193,7 +193,7 @@ class WABCPolicy(BasePolicy):
     def sample(self, obs: PyTorchObs, sample_num: int = 1, deterministic: bool = False) -> th.Tensor:
         batch_size = obs.shape[0]
 
-        nticks = 51
+        nticks = 11
         interpolation_num = 10
         vmin_x = -1.0
         vmax_x = 1.0

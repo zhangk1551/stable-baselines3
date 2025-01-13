@@ -992,8 +992,11 @@ class ContinuousCritic(BaseModel):
 #        print("features_extractor")
 #        print(self.features_extractor)
 #        print("enter q1_forward")
+#        print(obs)
 #        print("normalize_images")
 #        print(self.normalize_images)
+        if obs.max() > 1:
+            obs = obs.float() / 255.0
         features = self.extract_features(obs, self.features_extractor)
 #        print("enter q1_forward")
 #        print("features")

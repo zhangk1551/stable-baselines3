@@ -85,17 +85,22 @@ class EgoCentricCNN(BaseFeaturesExtractor):
         return x
 
     def forward(self, x):
-#        print("EgoCentricCNN forward")
-#        print("x")
-#        print(x.shape)
-#        print(x)
+#        if x.shape[0] == 4:
+#            print("EgoCentricCNN forward")
+#            print("x")
+#            print(x.shape)
+#            print(x)
         x = self._forward_features(x)
+#        if x.shape[0] == 4:
+#            print("forward features")
+#            print(x)
         x = x.view(x.size(0), -1)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
-#        print("after forward:")
-#        print("x")
-#        print(x)
+#        if x.shape[0] == 4:
+#            print("after forward:")
+#            print("x")
+#            print(x)
         return x
 
 
