@@ -202,7 +202,7 @@ class WABCPolicy(BasePolicy):
 #        deterministic = True
 
 #        probabilities = (self.get_c_grid(obs, nticks, interpolation_num, vmin_x, vmax_x, vmin_y, vmax_y)).view(batch_size, -1)
-        probabilities = (self.get_w_grid(obs, nticks, interpolation_num, vmin_x, vmax_x, vmin_y, vmax_y)).view(batch_size, -1)
+        probabilities = (self.get_b_grid(obs, nticks, interpolation_num, vmin_x, vmax_x, vmin_y, vmax_y)).view(batch_size, -1)
         probabilities /= th.sum(probabilities, dim=1, keepdims=True)
 #        topk_values, topk_indices = th.topk(probabilities, k=5, dim=1)
 #        print("topk_indices")

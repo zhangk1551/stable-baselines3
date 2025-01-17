@@ -177,12 +177,17 @@ def get_grid_action_prob(fn, observation, vmin_x=-1.0, vmax_x=1.0, vmin_y=-1.0, 
         log_p_max = np.max(log_p, axis=(1, 2), keepdims=True)
         p = np.exp(log_p - log_p_max)
         p = p / np.sum(p, axis=(1, 2), keepdims=True)
-        p = p * 0.9 + 0.1
+#        p = p * 0.9 + 0.1
+#        p = p * 0.8
+        # set the probability of action (-1.0, 0) to 0.2
+#        p[:, 0, nticks // 2] += 0.2
     else:
         # b_net
         p = fn(actions=actions, obs=observation).reshape(
             (batch_size, nticks, nticks)).transpose(1, 2).detach().cpu().numpy()
-#        p = p / np.sum(p, axis=(1, 2), keepdims=True)
+#        p = (p - p.min()) / (p.max() - p.min())
+        # use advantage function A(s, a) (p(a|s)) instead of Q(s, a) (p(s, a))
+        p = p / np.mean(p, axis=(1, 2), keepdims=True)
 
 
 #    print("p before interpolation")

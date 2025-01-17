@@ -220,6 +220,7 @@ class WABC(OffPolicyAlgorithm):
                 # Avoid potential broadcast issue
 #                next_q_values = next_q_values.reshape(-1, 1)
                 # 1-step TD target
+#                target_b_values = th.exp(replay_data.rewards) * th.pow(next_b_values, (1 - replay_data.dones))
                 target_b_values = th.exp(replay_data.rewards) * th.pow(next_b_values, (1 - replay_data.dones))
 #                count_ones = th.sum(target_b_values == 1)
 #                print(f"1: {count_ones.item()}")
@@ -291,17 +292,17 @@ class WABC(OffPolicyAlgorithm):
         :return: the model's action and the next state
             (used in recurrent policies)
         """
-#        if not deterministic and np.random.rand() < self.exploration_rate:
-#            if self.policy.is_vectorized_observation(observation):
-#                if isinstance(observation, dict):
-#                    n_batch = observation[next(iter(observation.keys()))].shape[0]
-#                else:
-#                    n_batch = observation.shape[0]
-#                action = np.array([self.action_space.sample() for _ in range(n_batch)])
-#            else:
-#                action = np.array(self.action_space.sample())
-#        else:
-        action, state = self.policy.predict(observation, state, episode_start, deterministic)
+        if not deterministic and np.random.rand() < self.exploration_rate:
+            if self.policy.is_vectorized_observation(observation):
+                if isinstance(observation, dict):
+                    n_batch = observation[next(iter(observation.keys()))].shape[0]
+                else:
+                    n_batch = observation.shape[0]
+                action = np.array([self.action_space.sample() for _ in range(n_batch)])
+            else:
+                action = np.array(self.action_space.sample())
+        else:
+            action, state = self.policy.predict(observation, state, episode_start, deterministic)
         return action, state
 
     def learn(

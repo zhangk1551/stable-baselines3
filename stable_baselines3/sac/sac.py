@@ -1,5 +1,6 @@
 from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
+import math
 import numpy as np
 import torch as th
 from gymnasium import spaces
@@ -290,11 +291,12 @@ class SAC(OffPolicyAlgorithm):
 #            print("q_values_pi")
 #            print(q_values_pi)
             min_qf_pi, _ = th.min(q_values_pi, dim=1, keepdim=True)
-            min_qf_pi = th.max(min_qf_pi, th.tensor(0.1, device=self.device))
+            min_qf_pi = th.max(min_qf_pi, th.tensor(math.ulp(0.0), device=self.device))
 #            p_c = th.exp(self.diffusion_expert.expert_batch_logp_from_energy(action=actions_pi, observation=replay_data.observations))
             logp_c = self.diffusion_expert.expert_batch_logp_from_energy(action=actions_pi, observation=replay_data.observations)
-            logp_c = th.max(logp_c, th.tensor(0.1, device=self.device))
+#            logp_c = th.max(logp_c, th.tensor(math.ulp(0.0), device=self.device))
             actor_loss = (ent_coef * log_prob - th.log(min_qf_pi) - logp_c).mean()
+#            actor_loss = (ent_coef * log_prob - logp_c).mean()
 #            actor_loss = (ent_coef * log_prob - min_qf_pi * p_c).mean()
             # TODO: revise the entropy term here
 #            actor_loss = (ent_coef * log_prob - min_qf_pi).mean()
