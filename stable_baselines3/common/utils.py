@@ -122,37 +122,15 @@ def get_linear_fn(start: float, end: float, end_fraction: float) -> Schedule:
     return func
 
 
-def check_static(obs) -> th.Tensor:
-    batch_size = obs.shape[0]
-    frame_num = 3
-    reshaped = obs.reshape(batch_size, frame_num, -1)
-    return (reshaped[:, None, 0, :] == reshaped[:, 1:, :]).all(dim=(1, 2))
-
-
 def get_grid_action_prob(fn, observation, vmin_x=-1.0, vmax_x=1.0, vmin_y=-1.0, vmax_y=1.0, nticks=10, interpolation_num=10, p_energy=False):
-#    action_x, action_y = np.meshgrid(np.linspace(vmin_x, vmax_x, nticks), np.linspace(vmin_y, vmax_y, nticks))
     nticks = 11
-#    interpolation_num = 100
     action_y, action_x = np.meshgrid(np.linspace(vmin_y, vmax_y, nticks), np.linspace(vmin_x, vmax_x, nticks))
-#    print("action_x.shape")
-#    print(action_x.shape)
-#    print("action_y.shape")
-#    print(action_y.shape)
     action_x = th.Tensor(action_x)
     action_y = th.Tensor(action_y)
     actions = th.stack([action_y, action_x], axis=-1).reshape(-1, 2).to(observation.device)
-#    print("grid actions")
-#    print(actions)
-#    print("actions in get_grid_action_prob")
-#    print(actions)
     if len(observation.shape) == 3:
         observation = observation.unsqueeze(0)
     batch_size = observation.shape[0]
-#    print("first")
-#    print("observation shape")
-#    print(observation.shape)
-#    print("actions shape")
-#    print(actions.shape)
     actions = actions.unsqueeze(0).expand(batch_size, -1, 2)  # Shape: [batch_size, nticks^2, 2]
 
     actions = actions.reshape(-1, 2)  # Shape: [batch_size * nticks^2, 2]
@@ -161,15 +139,7 @@ def get_grid_action_prob(fn, observation, vmin_x=-1.0, vmax_x=1.0, vmin_y=-1.0, 
     observation = observation.unsqueeze(1).expand(batch_size, nticks**2, *observation.shape[1:])  # Shape: [batch_size, nticks^2, channels, h, w]
     observation = observation.reshape(-1, *observation.shape[2:]).float()  # Shape: [batch_size * nticks^2, channels, h, w]
 
-#    observation = observation.unsqueeze(1).expand((batch_size, actions.shape[0], *observation.shape[1:])).to(observation.device)
-#    actions = actions.unsqueeze(0).expand(batch_size, -1, -1)
-#    print("observation shape")
-#    print(observation.shape)
-#    print("actions shape")
-#    print(actions.shape)
-
     if p_energy:
-        # p_energy
         t = th.Tensor([0]).int().expand((actions.shape[0])).to(observation.device)
         actions[..., 1] *= 3.0
         log_p = - fn(actions, t, observation).reshape(
@@ -177,26 +147,16 @@ def get_grid_action_prob(fn, observation, vmin_x=-1.0, vmax_x=1.0, vmin_y=-1.0, 
         log_p_max = np.max(log_p, axis=(1, 2), keepdims=True)
         p = np.exp(log_p - log_p_max)
         p = p / np.sum(p, axis=(1, 2), keepdims=True)
-#        p = p * 0.9 + 0.1
-#        p = p * 0.8
-        # set the probability of action (-1.0, 0) to 0.2
-#        p[:, 0, nticks // 2] += 0.2
     else:
         # b_net
-        p = fn(actions=actions, obs=observation).reshape(
+        p = th.cat(fn(actions=actions, obs=observation), dim=1)
+        p, _ = th.min(p, dim=1, keepdim=False)
+        p = p.reshape(
             (batch_size, nticks, nticks)).transpose(1, 2).detach().cpu().numpy()
-#        p = (p - p.min()) / (p.max() - p.min())
         # use advantage function A(s, a) (p(a|s)) instead of Q(s, a) (p(s, a))
-        p = p / np.mean(p, axis=(1, 2), keepdims=True)
-
-
-#    print("p before interpolation")
-#    print(p.shape)
+#        p = p / np.mean(p, axis=(1, 2), keepdims=True)
 
     interpolated_p = th.Tensor(np.stack([zoom(p[i], (interpolation_num, interpolation_num), order=1) for i in range(batch_size)])).to(observation.device)
-#    interpolated_p /= th.sum(interpolated_p, dim=(1, 2), keepdim=True)
-#    print("interpolated_p shape")
-#    print(interpolated_p.shape)
 
     return interpolated_p
 

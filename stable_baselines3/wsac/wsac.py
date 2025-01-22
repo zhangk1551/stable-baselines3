@@ -1,5 +1,6 @@
 from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
+import math
 import numpy as np
 import torch as th
 from gymnasium import spaces
@@ -9,14 +10,16 @@ from stable_baselines3.common.buffers import ReplayBuffer
 from stable_baselines3.common.noise import ActionNoise
 from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
 from stable_baselines3.common.policies import BasePolicy, ContinuousCritic
-from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule
-from stable_baselines3.common.utils import get_parameters_by_name, polyak_update
-from stable_baselines3.sac.policies import Actor, CnnPolicy, MlpPolicy, MultiInputPolicy, SACPolicy
+from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule, PyTorchObs
+from stable_baselines3.common.utils import get_parameters_by_name, polyak_update, get_grid_action_prob
+from stable_baselines3.wsac.policies import Actor, CnnPolicy, MlpPolicy, MultiInputPolicy, WSACPolicy
+
+from torchdriveenv.diffusion_expert import DiffusionExpert
 
 SelfSAC = TypeVar("SelfSAC", bound="SAC")
 
 
-class SAC(OffPolicyAlgorithm):
+class WSAC(OffPolicyAlgorithm):
     """
     Soft Actor-Critic (SAC)
     Off-Policy Maximum Entropy Deep Reinforcement Learning with a Stochastic Actor,
@@ -82,14 +85,14 @@ class SAC(OffPolicyAlgorithm):
         "CnnPolicy": CnnPolicy,
         "MultiInputPolicy": MultiInputPolicy,
     }
-    policy: SACPolicy
+    policy: WSACPolicy
     actor: Actor
     critic: ContinuousCritic
     critic_target: ContinuousCritic
 
     def __init__(
         self,
-        policy: Union[str, Type[SACPolicy]],
+        policy: Union[str, Type[WSACPolicy]],
         env: Union[GymEnv, str],
         learning_rate: Union[float, Schedule] = 3e-4,
         buffer_size: int = 1_000_000,  # 1e6
@@ -153,6 +156,8 @@ class SAC(OffPolicyAlgorithm):
         self.target_update_interval = target_update_interval
         self.ent_coef_optimizer: Optional[th.optim.Adam] = None
 
+        self.diffusion_expert = DiffusionExpert("pretrained_edm_module/model.ckpt")
+
         if _init_setup_model:
             self._setup_model()
 
@@ -195,6 +200,26 @@ class SAC(OffPolicyAlgorithm):
         self.actor = self.policy.actor
         self.critic = self.policy.critic
         self.critic_target = self.policy.critic_target
+
+    def get_b_grid(self, obs: PyTorchObs, nticks: int = 10, interpolation_num: int = 10,
+                   vmin_x = -1.0, vmax_x = 1.0, vmin_y = -1.0, vmax_y = 1.0) -> th.Tensor:
+        with th.no_grad():
+#            if obs.max() > 1:
+#                obs = obs.float() / 255.0
+            b_grid = get_grid_action_prob(fn=self.critic_target, observation=obs,
+                                          vmin_x=vmin_x, vmax_x=vmax_x, vmin_y=vmin_y, vmax_y=vmax_y,
+                                          nticks=nticks, interpolation_num=interpolation_num)
+        return b_grid
+
+    def get_c_grid(self, obs: PyTorchObs, nticks: int = 10, interpolation_num: int = 10,
+                   vmin_x = -1.0, vmax_x = 1.0, vmin_y = -1.0, vmax_y = 1.0) -> th.Tensor:
+        with th.no_grad():
+            if obs.max() > 1:
+                obs = obs.float() / 255.0
+            c_grid = get_grid_action_prob(fn=self.diffusion_expert.module.diffusion.p_energy, observation=obs,
+                                          vmin_x=vmin_x, vmax_x=vmax_x, vmin_y=vmin_y, vmax_y=vmax_y,
+                                          nticks=nticks, interpolation_num=interpolation_num, p_energy=True)
+        return c_grid
 
     def train(self, gradient_steps: int, batch_size: int = 64) -> None:
         # Switch to train mode (this affects batch norm / dropout)
@@ -248,19 +273,32 @@ class SAC(OffPolicyAlgorithm):
                 # Compute the next Q values: min over all critics targets
                 next_q_values = th.cat(self.critic_target(replay_data.next_observations, next_actions), dim=1)
                 next_q_values, _ = th.min(next_q_values, dim=1, keepdim=True)
-                # add entropy term
-                next_q_values = next_q_values - ent_coef * next_log_prob.reshape(-1, 1)
+                # TODO: add entropy term
+#                next_q_values = next_q_values - ent_coef * next_log_prob.reshape(-1, 1)
+#                next_q_values = next_q_values / th.pow(th.exp(next_log_prob), ent_coef).reshape(-1, 1)
                 # td error + entropy term
-                target_q_values = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values
+#                target_q_values = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values
+                target_q_values = th.exp(replay_data.rewards) * th.pow(th.pow(next_q_values, (1 - replay_data.dones)), self.gamma)
+
+#                print("next_observations")
+#                print(replay_data.next_observations)
+
+#                count_ones = th.sum(target_q_values == 1)
+#                print(f"1: {count_ones.item()}")
+#                count_zeros = th.sum(target_q_values == 0)
+#                print(f"0: {count_zeros.item()}")
+#                print("rewards dones target_b_values:")
+#                print(th.cat([replay_data.rewards, replay_data.dones, target_q_values], dim=-1))
 
             # Get current Q-values estimates for each critic network
             # using action from the replay buffer
             current_q_values = self.critic(replay_data.observations, replay_data.actions)
 
             # Compute critic loss
-            critic_loss = 0.5 * sum(F.mse_loss(current_q, target_q_values) for current_q in current_q_values)
+            critic_loss = 0.5 * sum(F.binary_cross_entropy(current_q, target_q_values) for current_q in current_q_values)
             assert isinstance(critic_loss, th.Tensor)  # for type checker
             critic_losses.append(critic_loss.item())  # type: ignore[union-attr]
+
 
             # Optimize the critic
             self.critic.optimizer.zero_grad()
@@ -272,7 +310,10 @@ class SAC(OffPolicyAlgorithm):
             # Min over all critic networks
             q_values_pi = th.cat(self.critic(replay_data.observations, actions_pi), dim=1)
             min_qf_pi, _ = th.min(q_values_pi, dim=1, keepdim=True)
-            actor_loss = (ent_coef * log_prob - min_qf_pi).mean()
+            min_qf_pi = th.max(min_qf_pi, th.tensor(math.ulp(0.0), device=self.device))
+            logp_c = self.diffusion_expert.expert_batch_logp_from_energy(action=actions_pi, observation=replay_data.observations)
+            logp_c = th.max(logp_c, th.tensor(math.log(math.ulp(0.0)), device=self.device))
+            actor_loss = (ent_coef * log_prob - th.log(min_qf_pi) - logp_c).mean()
             actor_losses.append(actor_loss.item())
 
             # Optimize the actor

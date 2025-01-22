@@ -193,9 +193,7 @@ class ReplayBuffer(BaseBuffer):
     ):
         super().__init__(buffer_size, observation_space, action_space, device, n_envs=n_envs)
 
-        print("in ReplayBuffer: set handle_timeout_termination to False")
-        handle_timeout_termination = False
-
+        print("handle_timeout_termination: ", handle_timeout_termination)
         # Adjust buffer size
         self.buffer_size = max(buffer_size // n_envs, 1)
 

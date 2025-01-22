@@ -6,9 +6,8 @@ from stable_baselines3.ddpg import DDPG
 from stable_baselines3.dqn import DQN
 from stable_baselines3.her.her_replay_buffer import HerReplayBuffer
 from stable_baselines3.ppo import PPO
-from stable_baselines3.sac import SAC
 from stable_baselines3.td3 import TD3
-from stable_baselines3.wabc import WABC
+from stable_baselines3.wsac import WSAC
 
 # Read version from file
 version_file = os.path.join(os.path.dirname(__file__), "version.txt")
@@ -28,9 +27,8 @@ __all__ = [
     "DDPG",
     "DQN",
     "PPO",
-    "SAC",
     "TD3",
-    "WABC",
+    "WSAC",
     "HerReplayBuffer",
     "get_system_info",
 ]

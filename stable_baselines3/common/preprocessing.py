@@ -117,8 +117,7 @@ def preprocess_obs(
 
     if isinstance(observation_space, spaces.Box):
         if normalize_images and is_image_space(observation_space):
-            if obs.max() > 1:
-                return obs.float() / 255.0
+            return obs.float() / 255.0
         return obs.float()
 
     elif isinstance(observation_space, spaces.Discrete):

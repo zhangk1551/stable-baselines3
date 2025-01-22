@@ -1,9 +1,7 @@
 from typing import Dict, List, Optional, Tuple, Type, Union
 
-import math
 import gymnasium as gym
 import torch as th
-import torch.nn.functional as F
 from gymnasium import spaces
 from torch import nn
 
@@ -46,62 +44,6 @@ class FlattenExtractor(BaseFeaturesExtractor):
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
         return self.flatten(observations)
-
-
-class EgoCentricCNN(BaseFeaturesExtractor):
-    def __init__(self, observation_space, features_dim=128):
-        super().__init__(observation_space=observation_space, features_dim=features_dim)
-
-        input_shape=(9, 64, 64)
-#        print(input_shape)
-        downsample_kernel_size = math.ceil(input_shape[-1] / 256)
-        self.pool0 = nn.AvgPool2d(downsample_kernel_size)
-
-        self.conv1 = nn.Conv2d(input_shape[-3], 16, 3)
-        self.conv2 = nn.Conv2d(16, 16, 3)
-        self.conv3 = nn.Conv2d(16, 32, 3)
-        self.conv4 = nn.Conv2d(32, 32, 3)
-
-        self.pool1 = nn.MaxPool2d(2)
-
-        n_sizes = self._get_conv_output(input_shape)
-
-        self.fc1 = nn.Linear(n_sizes, 256)
-        self.fc2 = nn.Linear(256, features_dim)
-
-    def _get_conv_output(self, shape):
-        input = th.autograd.Variable(th.rand(1, *shape))
-
-        output_feat = self._forward_features(input)
-        n_size = output_feat.data.view(1, -1).size(1)
-        return n_size
-
-    def _forward_features(self, x):
-        x = self.pool0(x)
-        x = F.relu(self.conv1(x))
-        x = self.pool1(F.relu(self.conv2(x)))
-        x = F.relu(self.conv3(x))
-        x = self.pool1(F.relu(self.conv4(x)))
-        return x
-
-    def forward(self, x):
-#        if x.shape[0] == 4:
-#            print("EgoCentricCNN forward")
-#            print("x")
-#            print(x.shape)
-#            print(x)
-        x = self._forward_features(x)
-#        if x.shape[0] == 4:
-#            print("forward features")
-#            print(x)
-        x = x.view(x.size(0), -1)
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-#        if x.shape[0] == 4:
-#            print("after forward:")
-#            print("x")
-#            print(x)
-        return x
 
 
 class NatureCNN(BaseFeaturesExtractor):
