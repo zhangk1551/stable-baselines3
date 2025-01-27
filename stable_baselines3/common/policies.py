@@ -949,6 +949,7 @@ class ContinuousCritic(BaseModel):
         normalize_images: bool = True,
         n_critics: int = 2,
         share_features_extractor: bool = True,
+        use_sigmoid: bool = False,
     ):
         super().__init__(
             observation_space,
@@ -963,7 +964,7 @@ class ContinuousCritic(BaseModel):
         self.n_critics = n_critics
         self.q_networks: List[nn.Module] = []
         for idx in range(n_critics):
-            q_net_list = create_mlp(features_dim + action_dim, 1, net_arch, activation_fn, use_sigmoid=True)
+            q_net_list = create_mlp(features_dim + action_dim, 1, net_arch, activation_fn, use_sigmoid=use_sigmoid)
             q_net = nn.Sequential(*q_net_list)
             self.add_module(f"qf{idx}", q_net)
             self.q_networks.append(q_net)

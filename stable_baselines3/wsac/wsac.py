@@ -11,7 +11,7 @@ from stable_baselines3.common.noise import ActionNoise
 from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
 from stable_baselines3.common.policies import BasePolicy, ContinuousCritic
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule, PyTorchObs
-from stable_baselines3.common.utils import get_parameters_by_name, polyak_update, get_grid_action_prob
+from stable_baselines3.common.utils import get_parameters_by_name, polyak_update, get_grid_action_prob, binary_cross_entropy
 from stable_baselines3.wsac.policies import Actor, CnnPolicy, MlpPolicy, MultiInputPolicy, WSACPolicy
 
 from torchdriveenv.diffusion_expert import DiffusionExpert
@@ -289,13 +289,26 @@ class WSAC(OffPolicyAlgorithm):
 #                print(f"0: {count_zeros.item()}")
 #                print("rewards dones target_b_values:")
 #                print(th.cat([replay_data.rewards, replay_data.dones, target_q_values], dim=-1))
+#            print("next_q_values")
+#            print(next_q_values)
+#            print("target_q_values")
+#            print(target_q_values)
+
 
             # Get current Q-values estimates for each critic network
             # using action from the replay buffer
             current_q_values = self.critic(replay_data.observations, replay_data.actions)
 
+#            print("current_q_values")
+#            print(current_q_values)
+#            print("rewards")
+#            print(replay_data.rewards)
+#            print(self.critic_target)
             # Compute critic loss
-            critic_loss = 0.5 * sum(F.binary_cross_entropy(current_q, target_q_values) for current_q in current_q_values)
+            critic_loss = 0.5 * sum(F.binary_cross_entropy(current_q, target_q_values).mean() for current_q in current_q_values)
+#            critic_loss = 0.5 * sum(F.mse_loss(current_q, target_q_values) for current_q in current_q_values)
+#            print("critic_loss")
+#            print(critic_loss)
             assert isinstance(critic_loss, th.Tensor)  # for type checker
             critic_losses.append(critic_loss.item())  # type: ignore[union-attr]
 

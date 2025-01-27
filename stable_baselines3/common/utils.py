@@ -122,6 +122,9 @@ def get_linear_fn(start: float, end: float, end_fraction: float) -> Schedule:
     return func
 
 
+def binary_cross_entropy(x: th.Tensor, y: th.Tensor) -> th.Tensor:
+    return -(y * th.log(x) + (1 - y) * th.log(1 - x))
+
 def get_grid_action_prob(fn, observation, vmin_x=-1.0, vmax_x=1.0, vmin_y=-1.0, vmax_y=1.0, nticks=10, interpolation_num=10, p_energy=False):
     nticks = 11
     action_y, action_x = np.meshgrid(np.linspace(vmin_y, vmax_y, nticks), np.linspace(vmin_x, vmax_x, nticks))

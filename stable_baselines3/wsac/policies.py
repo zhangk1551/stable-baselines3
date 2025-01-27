@@ -229,6 +229,7 @@ class WSACPolicy(BasePolicy):
         optimizer_kwargs: Optional[Dict[str, Any]] = None,
         n_critics: int = 2,
         share_features_extractor: bool = False,
+        use_sigmoid_in_critic: bool = True,
     ):
         super().__init__(
             observation_space,
@@ -270,6 +271,7 @@ class WSACPolicy(BasePolicy):
                 "n_critics": n_critics,
                 "net_arch": critic_arch,
                 "share_features_extractor": share_features_extractor,
+                "use_sigmoid": use_sigmoid_in_critic,
             }
         )
 
